@@ -537,6 +537,25 @@ void OLEDDisplay::drawXbm(int16_t xMove, int16_t yMove, int16_t width, int16_t h
   }
 }
 
+void OLEDDisplay::drawBitmap(int16_t x, int16_t y,  int16_t w, int16_t h, const uint8_t *bitmap) {
+
+  int16_t byteWidth = (w + 7) / 8; // Bitmap scanline pad = whole byte
+  uint8_t byte = 0;
+
+  for (int16_t j = 0; j < h; j++, y++) {
+    for (int16_t i = 0; i < w; i++) {
+      if (i & 7)
+        byte <<= 1;
+      else
+        byte = pgm_read_byte(bitmap + (i / 8) + j * byteWidth);
+        //byte = bitmap[j * byteWidth + i / 8];
+      if (byte & 0x80)
+        setPixel(x + i, y);
+    }
+  }
+}
+
+
 void OLEDDisplay::drawIco16x16(int16_t xMove, int16_t yMove, const uint8_t *ico, bool inverse) {
   uint16_t data;
 
@@ -577,13 +596,11 @@ void OLEDDisplay::drawStringInternal(int16_t xMove, int16_t yMove, char* text, u
 
   // Don't draw anything if it is not on the screen.
   if (xMove + textWidth  < 0 || xMove > this->width() ) {return;}
-  if (yMove + textHeight < 0 || yMove > this->height()) {return;}
+  if (yMove + textHeight < 0 || yMove > this->width() ) {return;}
 
   for (uint16_t j = 0; j < textLength; j++) {
     int16_t xPos = xMove + cursorX;
     int16_t yPos = yMove + cursorY;
-    if (xPos > this->width())
-      break; // no need to continue
 
     uint8_t code = text[j];
     if (code >= firstChar) {
@@ -663,9 +680,9 @@ void OLEDDisplay::drawStringMaxWidth(int16_t xMove, int16_t yMove, uint16_t maxL
   for (uint16_t i = 0; i < length; i++) {
     strWidth += pgm_read_byte(fontData + JUMPTABLE_START + (text[i] - firstChar) * JUMPTABLE_BYTES + JUMPTABLE_WIDTH);
 
-    // Always try to break on a space, dash or slash
-    if (text[i] == ' ' || text[i]== '-' || text[i] == '/') {
-      preferredBreakpoint = i + 1;
+    // Always try to break on a space or dash
+    if (text[i] == ' ' || text[i]== '-') {
+      preferredBreakpoint = i;
       widthAtBreakpoint = strWidth;
     }
 
@@ -675,7 +692,7 @@ void OLEDDisplay::drawStringMaxWidth(int16_t xMove, int16_t yMove, uint16_t maxL
         widthAtBreakpoint = strWidth;
       }
       drawStringInternal(xMove, yMove + (lineNumber++) * lineHeight , &text[lastDrawnPos], preferredBreakpoint - lastDrawnPos, widthAtBreakpoint);
-      lastDrawnPos = preferredBreakpoint;
+      lastDrawnPos = preferredBreakpoint + 1;
       // It is possible that we did not draw all letters to i so we need
       // to account for the width of the chars from `i - preferredBreakpoint`
       // by calculating the width we did not draw yet.
